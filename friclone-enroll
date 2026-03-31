@@ -34,7 +34,7 @@ fi
 _PWD=$(pwd)
 
 # get filesystem UUID. If someone can fix this, please, do!
-FS_UUID=$(blkid -s UUID -o value $(btrfs filesystem usage "$1" | grep -o "/dev/[^ ]*" | tail -n -1))
+FS_UUID=$(blkid -s UUID -o value $(btrfs filesystem usage "${SUBVOL}" | grep -o "/dev/[^ ]*" | tail -n -1))
 
 # create dirs
 mkdir /run/friclone 2> /dev/null
