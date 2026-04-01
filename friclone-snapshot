@@ -35,23 +35,27 @@ if ! [ -e "${FRICL}" ]; then
     btrfs subvol create "${FRICL}"
 fi
 mkdir "${FRICL}/snapshots" 2> /dev/null
-DESTPATH="$FRICL/snapshots/${FS_UUID}"
-mkdir "${DESTPATH}" 2> /dev/null
+SNAPDIR="$FRICL/snapshots/${FS_UUID}"
+mkdir "${SNAPDIR}" 2> /dev/null
 DATE=$(date -u -Is)
-DESTPATH="${DESTPATH}/${DATE}"
+DESTPATH="${SNAPDIR}/${DATE}"
 mkdir "${DESTPATH}" 2> /dev/null
 
 LINKPATH="$FRICL/subvolumes/$FS_UUID/"
 if cd $LINKPATH; then 
     for i in $(ls | sort); do
         if vol=$(readlink $i); then
-            echo "snapshot ${vol} -> ${DESTPATH}/${i}"
-            btrfs subvol snapshot -r "${vol}" "${DESTPATH}/${i}"
+            echo "snapshot ${vol} -> ${DESTPATH}/${i}/snapshot"
+            cp -d $i "${DESTPATH}/${i}/link"
+            btrfs subvol snapshot -r "${vol}" "${DESTPATH}/${i}/snapshot"
         fi
     done
 else
     echo "No subvolumes enrolled. Maybe use friclone-enroll?" >&2
 fi
+
+rm "${SNAPDIR}/latest" 2> /dev/null
+ln -srf "${DESTPATH}" "${SNAPDIR}/latest"
 # return to old dir
 cd "$_PWD"
 

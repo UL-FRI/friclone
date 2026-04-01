@@ -46,13 +46,12 @@ if [ ! -z ${SNAP} ] && [ -d "${SRCPATH}" ]; then
     BACKUP="${BACKUP}/${DATE}"
     mkdir "${BACKUP}" 2> /dev/null
 
-    LINKPATH="$FRICL/subvolumes/$FS_UUID/"
-    if cd $LINKPATH; then 
+    if cd "${SRCPATH}"; then
         for i in $(ls | sort); do
             # skip ../../../ - 9 characters
-            vol=$(readlink $i | cut -c 10-)
+            vol=$(readlink "${i}/link" | cut -c 10-)
             mv "${ROOTMNT}/${vol}" "${BACKUP}/${i}"
-            btrfs subvol snapshot "${SRCPATH}/$i" "${ROOTMNT}/${vol}"
+            btrfs subvol snapshot "${i}/snapshot" "${ROOTMNT}/${vol}"
         done
     else
         echo "No subvolumes enrolled. Maybe use friclone-enroll?" >&2
