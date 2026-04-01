@@ -46,6 +46,7 @@ if cd $LINKPATH; then
     for i in $(ls | sort); do
         if vol=$(readlink $i); then
             echo "snapshot ${vol} -> ${DESTPATH}/${i}/snapshot"
+            mkdir "${DESTPATH}/${i}"
             cp -d $i "${DESTPATH}/${i}/link"
             btrfs subvol snapshot -r "${vol}" "${DESTPATH}/${i}/snapshot"
         fi
