@@ -51,6 +51,7 @@ if [ ! -z ${SNAP} ] && [ -d "${SRCPATH}" ]; then
         for i in $(ls | sort); do
             # skip ../../../ - 9 characters
             vol=$(readlink "${i}/link" | cut -c 10-)
+            mkdir "${BACKUP}/${i}"
             mv "${ROOTMNT}/${vol}" "${BACKUP}/${i}/snapshot"
             cp "${i}/link" "${BACKUP}/${i}/link"
             btrfs subvol snapshot "${i}/snapshot" "${ROOTMNT}/${vol}"
