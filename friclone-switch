@@ -53,7 +53,7 @@ if [ ! -z ${SNAP} ] && [ -d "${SRCPATH}" ]; then
             vol=$(readlink "${i}/link" | cut -c 10-)
             mkdir "${BACKUP}/${i}"
             mv "${ROOTMNT}/${vol}" "${BACKUP}/${i}/snapshot"
-            cp "${i}/link" "${BACKUP}/${i}/link"
+            cp "${i}" "${BACKUP}/${i}/link"
             btrfs subvol snapshot "${i}/snapshot" "${ROOTMNT}/${vol}"
         done
     else
