@@ -71,7 +71,7 @@ case "${CMD}" in
             # delete the link if the snapshot does not exist
             [ -e "${d}/snapshot" ] || rm "${d}/link"
             # delete the backup dir; this will fail if it is not empty
-            rmdir "${d}"
+            rmdir "${d}" 2> /dev/null
 
         done
         # delete the empty backup dirs
