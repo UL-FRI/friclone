@@ -65,15 +65,14 @@ case "${CMD}" in
                 else
                     echo "SKIP ${d} as it is mounted somewhere!" >&2
                 fi
-                # delete the snapshot if it is an empty dir
-                rmdir "${d}/snapshot"
-                # delete the link if the snapshot does not exist
-                if ! [ -e "${d}/snapshot" ]; then
-                    rm "${d}/link"
-                fi
-                # delete the backup dir; this will fail if it is not empty
-                rmdir "${d}"
             fi
+            # delete the snapshot if it is an empty dir
+            rmdir "${d}/snapshot" 2> /dev/null
+            # delete the link if the snapshot does not exist
+            [ -e "${d}/snapshot" ] || rm "${d}/link"
+            # delete the backup dir; this will fail if it is not empty
+            rmdir "${d}"
+
         done
         # delete the empty backup dirs
         rmdir "${FRICL}/backup/${FS_UUID}"/*/ 2> /dev/null
