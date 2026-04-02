@@ -61,16 +61,21 @@ case "${CMD}" in
                 done
                 # if the volume is mounted anywhere, skip
                 if [ -z "${safe}" ]; then
-                    btrfs subvolume delete -R "${d}/snapshot" && rm "${d}/link"
+                    btrfs subvolume delete -R "${d}/snapshot"
                 else
                     echo "SKIP ${d} as it is mounted somewhere!" >&2
                 fi
-                # delete the snapshot and link if the snapshot is an empty dir
-                rmdir "${d}/snapshot" && rm "${d}/link"
+                # delete the snapshot if it is an empty dir
+                rmdir "${d}/snapshot"
+                # delete the link if the snapshot does not exist
+                if ! [ -e "${d}/snapshot" ] then
+                    rm "${d}/link"
+                fi
                 # delete the backup dir; this will fail if it is not empty
                 rmdir "${d}"
             fi
         done
+        # delete the empty backup dirs
         rmdir "${FRICL}/backup/${FS_UUID}"/*/ 2> /dev/null
         rmdir "${FRICL}/backup/${FS_UUID}" 2> /dev/null
         ;;
