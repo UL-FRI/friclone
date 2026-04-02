@@ -50,8 +50,8 @@ case "${CMD}" in
     clean)
         for d in "${FRICL}/backup/${FS_UUID}"/*/*; do
             if [ -d "${d}/snapshot" ]; then
-                vol_id=$(btrfs inspect-internal rootid "${d}")
                 safe=""
+                vol_id=$(btrfs inspect-internal rootid "${d}/snapshot") || safe="no"
                 # if the volume is mounted anywhere, mark safe=no
                 for dev in $(mount -t btrfs | cut -d ' ' -f 1,6 | grep "[(,]subvolid=${vol_id}[,)]" | cut -d " " -f 1); do
                     dev_uuid=$(blkid -s UUID -o value "${dev}")
