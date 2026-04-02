@@ -1,0 +1,76 @@
+#!/bin/sh
+
+
+print_help() {
+    echo "usage: $0 <path> <snapshot> [subvol]"
+    echo ""
+    echo "Send snapshot"
+    echo "  If <snapshot> is not specified, list snapshots and their links."
+    echo "  Without [subvol], list subvolumes and where they point to."
+    echo "  If [subvol] is specified and exists, output a zstd compressed snapshot."
+    echo ""
+    echo "If any snapshots named sent-* exist, use them as clone sources when sending the snapshot."
+    echo "Creates a snapshot name called sent-DATE on success."
+}
+
+if [ $# -lt 1 ]; then
+    print_help >&2
+    exit 1
+fi
+
+SUBVOL="$1"
+SNAP="$2"
+SUBSUBVOL="$3"
+
+# save current dir
+_PWD=$(pwd)
+
+# get filesystem UUID. If someone can fix this, please, do!
+FS_UUID=$(blkid -s UUID -o value $(btrfs filesystem usage "${SUBVOL}" | grep -o "/dev/[^ ]*" | tail -n -1)) || { echo "Can not determine filesystem UUID" >&2; exit 1; }
+
+# create dirs
+mkdir /run/friclone 2> /dev/null
+ROOTMNT=/run/friclone/$FS_UUID
+mkdir "${ROOTMNT}" 2> /dev/null
+
+# mount the root filesystem containing the volume to be enrolled
+mount -o subvol=/ /dev/disk/by-uuid/$FS_UUID /run/friclone/$FS_UUID
+
+# create friclone directories
+FRICL=/run/friclone/$FS_UUID/.friclone
+if ! [ -e "${FRICL}" ]; then
+    btrfs subvol create "${FRICL}"
+fi
+
+SRCPATH="$FRICL/snapshots/${FS_UUID}/${SNAP}"
+if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
+    if cd "${SRCPATH}"; then
+        [ -L "${SNAP}" ] && SNAP=$(readlink "${SNAP}")
+        if [ ! -z "${SUBSUBVOL}" ] && [ -d "${SRCPATH}/${SUBSUBVOL}"]; then
+            DATE=$(date -u -Is)
+            parents=$(ls "${SRCPATH}/sent-*/snapshot")
+            [ -z "${parents}" ] && parents="-c ${parents}"
+            if [ -e "sent-${DATE}"]; then
+                echo "Refuse to send more than one snapshot in one second" >&2;
+            else
+                echo "btrfs send --proto 0 ${parents} ${SRCPATH}/${SUBSUBVOL} | zstd -z --stdout && ln -s ${SNAP} sent-${DATE}"
+            fi
+        else
+            for i in $(ls | sort); do
+                # skip ../../../ - 9 characters
+                echo -n "${SNAP}/${i}\t"; readlink "${i}/link"
+            done
+        fi
+    else
+        echo "No subvolumes enrolled. Maybe use friclone-enroll?" >&2
+    fi
+else
+    [ -z "${SNAP}" ] && ls
+fi
+
+# return to old dir
+cd "$_PWD"
+
+# cleanup
+umount "$ROOTMNT" && rmdir "$ROOTMNT"
+rmdir /run/friclone
