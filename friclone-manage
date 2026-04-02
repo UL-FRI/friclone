@@ -51,10 +51,9 @@ case "${CMD}" in
         for d in "${FRICL}/backup/${FS_UUID}/*"; do
             # if the volume is mounted, skip
             vol_id = $(btrfs inspect-internal rootid "${d}")
-            IFS=$'\n'
             safe=""
             for dev in $(mount -t btrfs | cut -d ' ' -f 1,6 | grep "[(,]subvolid=${vol_id}[,)]" | cut -d " " -f 1); do
-                if [ $(blkid("${dev}")) = "${FS_UUID}" ]; then
+                if [ $(blkid "${dev}") = "${FS_UUID}" ]; then
                     safe="no"
                 fi
             done
