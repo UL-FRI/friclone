@@ -14,7 +14,7 @@ print_help() {
     echo "  "
 }
 
-if [ $# -lt 1 ]; then
+if [ $# -lt 2 ]; then
     print_help >&2
     exit 1
 fi
@@ -48,7 +48,20 @@ SNAPDIR="$FRICL/snapshots/${FS_UUID}"
 
 case "${CMD}" in
     clean)
-        btrfs subvolume delete -R "${FRICL}/backup/${FS_UUID}/*"
+        for d in "${FRICL}/backup/${FS_UUID}/*"; do
+            # if the volume is mounted, skip
+            vol_id = $(btrfs inspect-internal rootid "${d}")
+            IFS=$'\n'
+            safe=""
+            for dev in $(mount -t btrfs | cut -d ' ' -f 1,6 | grep "[(,]subvolid=${vol_id}[,)]" | cut -d " " -f 1); do
+                if [ $(blkid("${dev}")) = "${FS_UUID}" ]; then
+                    safe="no"
+                fi
+            done
+            if [ -z "${safe}" ]; then
+                echo btrfs subvolume delete -R "${d}"
+            fi
+        done
         ;;
     name)
         ln -r -sf "${SNAPDIR}/${SNAP}" "${SNAPDIR}/${NAME}"
@@ -60,7 +73,7 @@ case "${CMD}" in
             echo "${TMPKEEP} exists - is another prune running?" >&2
         else
             mkdir ${TMPKEEP} 2> /dev/null
-            cd ${SNAPDIR}
+            cd "${SNAPDIR}"
             for i in *; do
                 if [ -L $i ]; then
                     mv "$(readlink $i)" "${TMPKEEP}"
@@ -77,9 +90,9 @@ case "${CMD}" in
     remove)
         if [ -z "${SNAP}" ]; then
             ls "${SNAPDIR}"
-        elif [ -L "${SNAPDIR}/${SNAP}"; ] then
+        elif [ -L "${SNAPDIR}/${SNAP}" ]; then
             rm "${SNAPDIR}/${SNAP}";
-        elif [ -d "${SNAPDIR/${SNAP}" ];
+        elif [ -d "${SNAPDIR}/${SNAP}" ]; then
             btrfs subvolume delete -R "${SNAPDIR}/${SNAP}/*/snapshot"
             rm -rf "${SNAPDIR}/${SNAP}"
         else
