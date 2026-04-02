@@ -48,17 +48,22 @@ SNAPDIR="$FRICL/snapshots/${FS_UUID}"
 
 case "${CMD}" in
     clean)
-        for d in "${FRICL}/backup/${FS_UUID}/*"; do
+        for d in "${FRICL}/backup/${FS_UUID}"/*/*/snapshot; do
             # if the volume is mounted, skip
-            vol_id=$(btrfs inspect-internal rootid "${d}")
-            safe=""
-            for dev in $(mount -t btrfs | cut -d ' ' -f 1,6 | grep "[(,]subvolid=${vol_id}[,)]" | cut -d " " -f 1); do
-                if [ $(blkid "${dev}") = "${FS_UUID}" ]; then
-                    safe="no"
+            if [ -d "${d}" ]; then
+                vol_id=$(btrfs inspect-internal rootid "${d}")
+                safe=""
+                for dev in $(mount -t btrfs | cut -d ' ' -f 1,6 | grep "[(,]subvolid=${vol_id}[,)]" | cut -d " " -f 1); do
+                    dev_uuid=$(blkid -s UUID -o value "${dev}")
+                    if [ "${dev_uuid}" = "${FS_UUID}" ]; then
+                        safe="no"
+                    fi
+                done
+                if [ -z "${safe}" ]; then
+                    btrfs subvolume delete -R "${d}"
+                else
+                    echo "SKIP {d} as it is mounted somewhere!" >&2
                 fi
-            done
-            if [ -z "${safe}" ]; then
-                echo btrfs subvolume delete -R "${d}"
             fi
         done
         ;;
