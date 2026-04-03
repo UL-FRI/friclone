@@ -26,7 +26,11 @@ SUBSUBVOL="$3"
 _PWD=$(pwd)
 
 # get filesystem UUID. If someone can fix this, please, do!
-FS_UUID=$(blkid -s UUID -o value $(btrfs filesystem usage "${SUBVOL}" | grep -o "/dev/[^ ]*" | tail -n -1)) || { echo "Can not determine filesystem UUID" >&2; exit 1; }
+FS_DEV=$(btrfs filesystem usage "${SUBVOL}" | grep -o "/dev/[^ ]*" | tail -n -1) 
+FS_UUID=$(blkid -s UUID -o value "${FS_DEV}") || { echo "Can not determine filesystem UUID" >&2; exit 1; }
+for i in /dev/disk/by-partuuid/*; do
+    [ "${FS_DEV}" = "$(readlink $i)" ] && FS_PARTUUID=$i;
+done
 
 # create dirs
 mkdir /run/friclone 2> /dev/null
@@ -71,7 +75,15 @@ if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
         else
             # list the links / subsubvolumes in a snapshot
             for i in $(ls | sort); do
-                echo -n "${SNAP}/${i}\t"; readlink "${i}/link"
+                SNAP_INFO="$(btrfs show $i/snapshot)"
+                SNAP_UUID=echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p'
+                SNAP_RECVUUID=echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*Received UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p'
+                if [ "${SNAP_RECVUUID}" = "-" ] || [ -z ${SNAP_RECVUUID}]; then
+                    SHOW_UUID=${SNAP_UUID}
+                else
+                    SHOW_UUID=${SNAP_RECVUUID}
+                fi
+                echo -n "${FS_UUID}\t${FS_PARTUUID}\t${SHOW_UUID}\t${SNAP}/${i}\t"; readlink "${i}/link"
             done
         fi
     else
