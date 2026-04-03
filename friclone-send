@@ -45,23 +45,28 @@ fi
 SRCPATH="$FRICL/snapshots/${FS_UUID}/${SNAP}"
 if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
     if cd "${SRCPATH}"; then
+        # always symlink to snapshots, not their names
         [ -L "${SRCPATH}" ] && SNAP=$(readlink "${SRCPATH}")
         if [ ! -z "${SUBSUBVOL}" ] && [ -d "${SRCPATH}/${SUBSUBVOL}" ]; then
+            # prepare symlink dirs
+            mkdir "${SENTDIR}" 2> /dev/null
             SENTDIR="${FRICL}/sent/${FS_UUID}"
             mkdir "${SENTDIR}" 2> /dev/null
-            parents=$(ls "${SENTDIR}/${SUBSUBVOL}-*/snapshot")
+            # read previously sent snapshots of the same volume
+            parents=$(ls "${SENTDIR}/${SUBSUBVOL}-"*/snapshot) && parents=" -c ${parents}"
             [ -z "${parents}" ] && parents=" -c ${parents}"
-            SENTLNK=${SENTDIR}/${SUBSUBVOL}-$(date -u -Is)
+            SENTLINK=${SENTDIR}/${SUBSUBVOL}-${SNAP}
             if [ -e "SENTLNK" ]; then
-                echo "Refuse to send more than one snapshot in one second" >&2;
+                echo "Refuse to send snapshot more than once" >&2;
             else
+                # SEND SNAPSHOT AND CREATE SYMLINK IN sent
                 if btrfs send --proto 0${parents} ${SRCPATH}/${SUBSUBVOL}/snapshot | zstd -z --stdout; then
                     ln -r -s "${SNAP}" "${SENTLINK}"
                 fi
             fi
         else
+            # list the links / subsubvolumes in a snapshot
             for i in $(ls | sort); do
-                # skip ../../../ - 9 characters
                 echo -n "${SNAP}/${i}\t"; readlink "${i}/link"
             done
         fi
