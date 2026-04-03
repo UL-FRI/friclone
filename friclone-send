@@ -56,13 +56,14 @@ if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
             parents=$(ls "${SENTDIR}/${SUBSUBVOL}-"*/snapshot) && parents=" -c ${parents}"
             [ -z "${parents}" ] && parents=" -c ${parents}"
             SENTLINK=${SENTDIR}/${SUBSUBVOL}-${SNAP}
-            if [ -e "SENTLNK" ]; then
+            if [ -e "${SENTLINK}" ]; then
                 echo "Refuse to send snapshot more than once" >&2;
             else
                 # SEND SNAPSHOT AND CREATE SYMLINK IN sent
-                if btrfs send --proto 0${parents} ${SRCPATH}/${SUBSUBVOL}/snapshot | zstd -z --stdout; then
-                    ln -r -s "${SNAP}" "${SENTLINK}"
-                fi
+                { 
+                    btrfs send --proto 0${parents} ${SRCPATH}/${SUBSUBVOL}/snapshot &&\
+                        ln -r -s "${SNAP}" "${SENTLINK}"
+                } | zstd -z --stdout
             fi
         else
             # list the links / subsubvolumes in a snapshot
