@@ -55,7 +55,7 @@ if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
             # read previously sent snapshots of the same volume
             parents=""
             for parent in "${SENTDIR}/${SUBSUBVOL}-"*/snapshot; do
-                [ -e $parent ] && parents="${parents} -c \"${parent}\""
+                [ -e $parent ] && parents="${parents} -c "$(realpath "${parent}"
             done
             SENTLINK=${SENTDIR}/${SUBSUBVOL}-${SNAP}
             if [ -e "${SENTLINK}" ] || [ -L "${SENTLINK}" ]; then
