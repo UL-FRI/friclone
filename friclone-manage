@@ -116,8 +116,8 @@ case "${CMD}" in
                         if [ -d "${subsubvol}" ]; then
                             btrfs subvolume delete -R "${subsubvol}/snapshot"
                             rm "${subsubvol}/link"
+                            rmdir ${subsubvol}
                         fi
-                        rmdir ${subsubvol}
                     done
                     rmdir $i
                 fi
