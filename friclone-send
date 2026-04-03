@@ -83,7 +83,7 @@ if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
                 else
                     SHOW_UUID="${SNAP_RECVUUID}"
                 fi
-                echo -n "${FS_UUID}\t${FS_PARTUUID}\t${SHOW_UUID}\t${SNAP}/${i}\t"; readlink "${i}/link"
+                echo -n "${FS_UUID}\t${FS_PARTUUID}\t${SHOW_UUID}\t${SNAP}\t${i}\t"; readlink "${i}/link"
             done
         fi
     else
