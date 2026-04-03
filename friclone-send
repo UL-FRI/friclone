@@ -62,6 +62,7 @@ if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
                 echo "Refuse to send snapshot more than once" >&2;
             else
                 # SEND SNAPSHOT AND CREATE SYMLINK IN sent
+                btrfs send --proto 0${parents} ${SRCPATH}/${SUBSUBVOL}/snapshot >&2
                 { 
                     btrfs send --proto 0${parents} ${SRCPATH}/${SUBSUBVOL}/snapshot &&\
                         ln -r -s "${SRCPATH}/${SUBSUBVOL}" "${SENTLINK}" > /dev/null
