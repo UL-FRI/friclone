@@ -7,7 +7,7 @@ print_help() {
     echo "Manage snapshots"
     echo "  clean - remove backups"
     echo "  name - name a snapshot for easier access"
-    echo "  prune - remove all snapshots without names"
+    echo "  prune - remove all snapshots without names or references (sent/received)"
     echo "  remove - remove a snapshot (or name)"
     echo "  unbackup - change a backup into a snapshot"
 }
@@ -43,6 +43,10 @@ if ! [ -e "${FRICL}" ]; then
 fi
 
 SNAPDIR="$FRICL/snapshots/${FS_UUID}"
+mkdir ${SNAPDIR} 2> /dev/null
+SENTDIR="$FRICL/sent/${FS_UUID}"
+mkdir ${SENTDIR} 2> /dev/null
+RECEIVEDDIR="$FRICL/received/${FS_UUID}"
 
 case "${CMD}" in
     clean)
@@ -87,14 +91,29 @@ case "${CMD}" in
         else
             mkdir ${TMPKEEP} 2> /dev/null
             cd "${SNAPDIR}"
+            # Keep named snapshots
             for i in *; do
                 if [ -L $i ]; then
                     mv "$(readlink $i)" "${TMPKEEP}"
                     mv "$i" "${TMPKEEP}"
                 fi
             done
+            # Keep sent snapshots
+            cd "${SENTDIR}"
             for i in *; do
-                btrfs subvolume delete -R "$i"
+                if [ -e $i ]; then
+                    TMPSNAP=${TMPKEEP}/$(basename $(dirname $(readlink $i)))
+                    mkdir ${TMPSNAP} 2> /dev/null
+                    mv "${i}/link" "${TMPSNAP}"
+                    mv "${i}/snapshot" "${TMPSNAP}"
+                fi
+            done
+            # Remove remaining directories / snapshots
+            for i in *; do
+                btrfs subvolume delete -R "$i/snapshot"
+                rm $i/*/link
+                rmdir $i/*
+                rmdir $i
             done
             mv ${TMPKEEP}/* .
             rmdir ${TMPKEEP}
@@ -108,6 +127,9 @@ case "${CMD}" in
         elif [ -d "${SNAPDIR}/${SNAP}" ]; then
             btrfs subvolume delete -R "${SNAPDIR}/${SNAP}/*/snapshot"
             rm -rf "${SNAPDIR}/${SNAP}"
+            # remove dangling symlinks in sent
+            for i in ${SENTDIR}/*; do
+
         else
             ls "${SNAPDIR}"
         fi
