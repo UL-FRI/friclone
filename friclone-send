@@ -54,7 +54,6 @@ if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
             mkdir "${SENTDIR}" 2> /dev/null
             # read previously sent snapshots of the same volume
             parents=$(ls "${SENTDIR}/${SUBSUBVOL}-"*/snapshot) && parents=" -c ${parents}"
-            [ -z "${parents}" ] && parents=" -c ${parents}"
             SENTLINK=${SENTDIR}/${SUBSUBVOL}-${SNAP}
             if [ -e "${SENTLINK}" ]; then
                 echo "Refuse to send snapshot more than once" >&2;
@@ -62,7 +61,7 @@ if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
                 # SEND SNAPSHOT AND CREATE SYMLINK IN sent
                 { 
                     btrfs send --proto 0${parents} ${SRCPATH}/${SUBSUBVOL}/snapshot &&\
-                        ln -r -s "${SNAP}" "${SENTLINK}"
+                        ln -r -s "${SNAP}" "${SENTLINK}" > /dev/null
                 } | zstd -z --stdout
             fi
         else
