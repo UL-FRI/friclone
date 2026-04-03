@@ -75,7 +75,7 @@ if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
         else
             # list the links / subsubvolumes in a snapshot
             for i in $(ls | sort); do
-                SNAP_INFO=$(btrfs show $i/snapshot)
+                SNAP_INFO=$(btrfs subvolume show $i/snapshot)
                 SNAP_UUID=$(echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p')
                 SNAP_RECVUUID=$(echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*Received UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p')
                 if [ "${SNAP_RECVUUID}" = "-" ] || [ -z ${SNAP_RECVUUID}]; then
