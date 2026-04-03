@@ -61,7 +61,7 @@ if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
                 # SEND SNAPSHOT AND CREATE SYMLINK IN sent
                 { 
                     btrfs send --proto 0${parents} ${SRCPATH}/${SUBSUBVOL}/snapshot &&\
-                        ln -r -s "${$SRCPATH}/${SUBSUBVOL}" "${SENTLINK}" > /dev/null
+                        ln -r -s "${SRCPATH}/${SUBSUBVOL}" "${SENTLINK}" > /dev/null
                 } | zstd -z --stdout
             fi
         else
