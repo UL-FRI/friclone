@@ -26,10 +26,10 @@ SUBSUBVOL="$3"
 _PWD=$(pwd)
 
 # get filesystem UUID. If someone can fix this, please, do!
-FS_DEV=$(btrfs filesystem usage "${SUBVOL}" | grep -o "/dev/[^ ]*" | tail -n -1) 
-FS_UUID=$(blkid -s UUID -o value ${FS_DEV}) || { echo "Can not determine filesystem UUID" >&2; exit 1; }
+FS_DEV=$(realpath $(btrfs filesystem usage "${SUBVOL}" | grep -o "/dev/[^ ]*" | tail -n -1))
+FS_UUID=$(blkid -s UUID -o value "${FS_DEV}") || { echo "Can not determine filesystem UUID" >&2; exit 1; }
 for i in /dev/disk/by-partuuid/*; do
-    [ "${FS_DEV}" = "$(readlink $i)" ] && FS_PARTUUID=$i;
+    [ "${FS_DEV}" = "$(realpath $i)" ] && FS_PARTUUID=$(basename $i);
 done
 
 # create dirs
