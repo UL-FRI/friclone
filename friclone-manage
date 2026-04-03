@@ -101,11 +101,11 @@ case "${CMD}" in
             # Keep sent snapshots
             cd "${SENTDIR}"
             for i in *; do
-                if [ -L $i ]; then
-                    TMPSNAP=${TMPKEEP}/$(basename $(dirname $(readlink $i)))
+                if [ -L $i ] && [ -e $i ]; then
+                    dereffed=$(readlink "$i")
+                    TMPSNAP=${TMPKEEP}/$(basename $(dirname ${dereffed}))
                     mkdir ${TMPSNAP} 2> /dev/null
-                    mv "${i}/link" "${TMPSNAP}"
-                    mv "${i}/snapshot" "${TMPSNAP}"
+                    mv "${dereffed}" "${TMPSNAP}"
                 fi
             done
             # Remove remaining directories / snapshots
@@ -114,7 +114,7 @@ case "${CMD}" in
                 if [ -d $i ]; then
                     for subsubvol in $i/*; do
                         if [ -d "${subsubvol}" ]; then
-                            btrfs subvolume delete -R "${subsubvol}/snapshot"
+                            btrfs subvolume delete "${subsubvol}/snapshot"
                             rm "${subsubvol}/link"
                             rmdir ${subsubvol}
                         fi
