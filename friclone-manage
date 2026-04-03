@@ -2,7 +2,7 @@
 
 
 print_help() {
-    echo "usage: $0 <path> <clean|name|remove|prune> [snapshot] [name]"
+    echo "usage: $0 <path> <clean|name|prune|remove|unbackup> [snapshot] [name]"
     echo ""
     echo "Manage snapshots"
     echo "  clean - remove backups"
@@ -10,8 +10,6 @@ print_help() {
     echo "  prune - remove all snapshots without names"
     echo "  remove - remove a snapshot (or name)"
     echo "  unbackup - change a backup into a snapshot"
-    echo ""
-    echo "  "
 }
 
 if [ $# -lt 2 ]; then
