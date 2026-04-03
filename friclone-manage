@@ -128,8 +128,9 @@ case "${CMD}" in
             btrfs subvolume delete -R "${SNAPDIR}/${SNAP}/*/snapshot"
             rm -rf "${SNAPDIR}/${SNAP}"
             # remove dangling symlinks in sent
-            for i in ${SENTDIR}/*; do
-
+            for i in "${SENTDIR}/"*; do
+                [ -L "$i" ] && ! [ -e "$i" ] && rm "$i";
+            done
         else
             ls "${SNAPDIR}"
         fi
