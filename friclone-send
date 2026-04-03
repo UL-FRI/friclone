@@ -53,7 +53,10 @@ if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
             SENTDIR="${FRICL}/sent/${FS_UUID}"
             mkdir "${SENTDIR}" 2> /dev/null
             # read previously sent snapshots of the same volume
-            parents=$(ls "${SENTDIR}/${SUBSUBVOL}-"*/snapshot) && parents=" -c ${parents}"
+            parents=""
+            for parent in "${SENTDIR}/${SUBSUBVOL}-"*/snapshot; do
+                [ -e $parent ] && parents="${parents} -c \"${parent}\""
+            done
             SENTLINK=${SENTDIR}/${SUBSUBVOL}-${SNAP}
             if [ -e "${SENTLINK}" ] || [ -L "${SENTLINK}" ]; then
                 echo "Refuse to send snapshot more than once" >&2;
