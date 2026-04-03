@@ -81,7 +81,11 @@ case "${CMD}" in
         rmdir "${FRICL}/backup/${FS_UUID}" 2> /dev/null
         ;;
     name)
-        ln -r -sf "${SNAPDIR}/${SNAP}" "${SNAPDIR}/${NAME}"
+        if [ -z "${SNAP}" ] || [ -z "${NAME}" ] || ![ -e "${SNAPDIR}/${SNAP}" ] then
+            ls "${SNAPDIR}"
+        else
+            ln -r -sf "${SNAPDIR}/${SNAP}" "${SNAPDIR}/${NAME}"
+        fi
         ;;
     prune)
         mkdir ${FRICL}/tmpkeep 2> /dev/null
