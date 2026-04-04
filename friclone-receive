@@ -96,7 +96,7 @@ for LINE in ${SNAPSHOTS}; do
         L_SUBSUBVOL=$(echo "${LINE}" | cut -d'	' -f 5)
         L_LINK=$(echo "${LINE}" | cut -d'	' -f 6-)
         L_SNAPPATH=${SNAPDIR}/${L_SNAP}/${L_SUBSUBVOL}
-	
+
         mkdir "${SNAPDIR}/${L_SNAP}" 2> /dev/null
         mkdir "${L_SNAPPATH}" 2> /dev/null
         if [ -L "${L_SNAPPATH}/link" ]; then
@@ -104,14 +104,14 @@ for LINE in ${SNAPSHOTS}; do
                 echo "Link exists but points to a different path!" >&2;
                 rm "${L_SNAPPATH}/link"
                 ln -sf "${L_LINK}" "${L_SNAPPATH}/link"
-	    fi
-    	else
-	    echo "ln -sf" "${L_LINK}" "${L_SNAPPATH}/link"
+            fi
+        else
+            echo "ln -sf" "${L_LINK}" "${L_SNAPPATH}/link"
             ln -sf "${L_LINK}" "${L_SNAPPATH}/link"
-	fi
+        fi
         SKIP_RECV="false"
         if [ -e "${L_SNAPPATH}/snapshot" ]; then
-	    echo "${L_SNAPPATH}/snapshot exists!"
+            echo "${L_SNAPPATH}/snapshot exists!"
             SNAP_INFO=$(btrfs subvolume show "${L_SNAPPATH}/snapshot")
             SNAP_UUID=$(echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p')
             SNAP_RECVUUID=$(echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*Received UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p')
@@ -130,12 +130,12 @@ for LINE in ${SNAPSHOTS}; do
         fi
         if [ "${SKIP_RECV}" != "true" ]; then
             echo -n "Receiving ${URL}/${L_SNAPUUID}.zstd"
-	    if get_data "${URL}/${L_SNAPUUID}.zstd" | zstd -d | btrfs receive -q "${L_SNAPPATH}"; then
-	        echo " - SUCCESS"
-	    else
-	        echo " - FAIL"
-	        SUCCESS=false
-	    fi
+            if get_data "${URL}/${L_SNAPUUID}.zstd" | zstd -d | btrfs receive -q "${L_SNAPPATH}"; then
+                echo " - SUCCESS"
+            else
+                echo " - FAIL"
+                SUCCESS=false
+            fi
         fi
     fi
 done
@@ -152,5 +152,5 @@ fi
 cd "$_PWD"
 
 # cleanup
-#umount "$ROOTMNT" && rmdir "$ROOTMNT"
-#rmdir /run/friclone
+umount "$ROOTMNT" && rmdir "$ROOTMNT"
+rmdir /run/friclone
