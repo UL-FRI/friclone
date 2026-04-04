@@ -141,7 +141,7 @@ for LINE in ${SNAPSHOTS}; do
 done
 
 if [ "${URL_ACTION}" = "remember" ] && [ ${SUCCESS} = "true" ]; then
-    if grep -v -q "^${URL}\$" "${FRICL}/repos.txt"; then
+    if ! grep -q "^${URL}\$" "${FRICL}/repos.txt"; then
         echo "${URL}" >> "${FRICL}/repos.txt"
     fi
     echo "Repos now:"
