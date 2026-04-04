@@ -60,8 +60,8 @@ get_data() {
 
 SNAPDIR="${FRICL}/snapshots/${FS_UUID}"
 
-IFS="\n"
 SNAPSHOTS=""
+
 if [ "${URL_ACTION}" = "forget" ]; then
     cat "${FRICL}/repos.txt" | grep -v "^${URL}\$" > "${FRICL}/repos.txt"
     exit 0;
@@ -74,6 +74,9 @@ else
     SUCCESS="true"
 fi
 
+IFS='
+'
+
 for URL_I in ${URLLIST}; do
     if SNAPS_I=$(get_data "${URL}/snapshots.tsv"); then
         SNAPSHOTS="${SNAPS_I}"
@@ -85,31 +88,34 @@ for URL_I in ${URLLIST}; do
 done
 
 for LINE in ${SNAPSHOTS}; do
-    echo ${LINE}
-    L_FSUUID=$(echo "${LINE}" | cut -d$'\t' -f 1)
-    L_PARTUUID=$(echo "${LINE}" | cut -d$'\t' -f 2)
-    if [ "${L_PARTUUID}" = "${FS_PARTUUID}"] || [ "${L_FSUUID}" = "${FS_UUID}" ]; then
-        L_SNAPUUID=$(echo "${LINE}" | cut -d$'\t' -f 3)
-        L_SNAP=$(echo "${LINE}" | cut -d$'\t' -f 4)
-        L_SUBSUBVOL=$(echo "${LINE}" | cut -d$'\t' -f 5)
-        L_LINK=$(echo "${LINE}" | cut -d$'\t' -f 6-)
-        L_SNAPPATH=${SNAPDIR}/${L_SNAP}/${L_SUBSUBVOL}/
+    L_FSUUID=$(echo "${LINE}" | cut -d'	' -f 1)
+    L_PARTUUID=$(echo "${LINE}" | cut -d'	' -f 2)
+    if [ "${L_PARTUUID}" = "${FS_PARTUUID}" ] || [ "${L_FSUUID}" = "${FS_UUID}" ]; then
+        L_SNAPUUID=$(echo "${LINE}" | cut -d'	' -f 3)
+        L_SNAP=$(echo "${LINE}" | cut -d'	' -f 4)
+        L_SUBSUBVOL=$(echo "${LINE}" | cut -d'	' -f 5)
+        L_LINK=$(echo "${LINE}" | cut -d'	' -f 6-)
+        L_SNAPPATH=${SNAPDIR}/${L_SNAP}/${L_SUBSUBVOL}
+	
         mkdir "${SNAPDIR}/${L_SNAP}" 2> /dev/null
-        mkdir "${SNAPDIR}/${L_SNAP}/${L_SUBSUBVOL}" 2> /dev/null
-        if [ -e "${SNAPDIR}/${L_SNAP}/${L_SUBSUBVOL}/link" ]; then
-            if [ $(readlink "${SNAPDIR}/${L_SNAP}/${L_SUBSUBVOL}/link") != "$L_LINK" ]; then
+        mkdir "${L_SNAPPATH}" 2> /dev/null
+        if [ -L "${L_SNAPPATH}/link" ]; then
+            if [ $(readlink "${L_SNAPPATH}/link") != "$L_LINK" ]; then
                 echo "Link exists but points to a different path!" >&2;
-                rm "${SNAPDIR}/${L_SNAP}/${L_SUBSUBVOL}/link"
-            fi
-        fi
-        # receive link
-        ln -sf "${L_SNAPPATH}/link" "${L_LINK}" || SUCCESS=false
+                rm "${L_SNAPPATH}/link"
+                ln -sf "${L_LINK}" "${L_SNAPPATH}/link"
+	    fi
+    	else
+	    echo "ln -sf" "${L_LINK}" "${L_SNAPPATH}/link"
+            ln -sf "${L_LINK}" "${L_SNAPPATH}/link"
+	fi
         SKIP_RECV="false"
         if [ -e "${L_SNAPPATH}/snapshot" ]; then
+	    echo "${L_SNAPPATH}/snapshot exists!"
             SNAP_INFO=$(btrfs subvolume show "${L_SNAPPATH}/snapshot")
             SNAP_UUID=$(echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p')
             SNAP_RECVUUID=$(echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*Received UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p')
-            if [ "${SNAP_RECVUUID}" = "-" ] || [ -z ${SNAP_RECVUUID}]; then
+            if [ "${SNAP_RECVUUID}" = "-" ] || [ -z ${SNAP_RECVUUID} ]; then
                 SHOW_UUID="${SNAP_UUID}"
             else
                 SHOW_UUID="${SNAP_RECVUUID}"
@@ -118,16 +124,23 @@ for LINE in ${SNAPSHOTS}; do
                 echo "UUIDs do not match, deleting old snapshot" >&2
                 btrfs subvolume delete "${L_SNAPPATH}/snapshot"
             else
+                echo "Skip existing snapshot ${L_SNAPUUID}" >&2
                 SKIP_RECV="true"
             fi
         fi
         if [ "${SKIP_RECV}" != "true" ]; then
-            get_data "${URL}/${L_FSUUID}.zstd" | zstd -d | btrfs receive "${L_SNAPPATH}/snapshot" || SUCCESS=false
+            echo -n "Receiving ${URL}/${L_SNAPUUID}.zstd"
+	    if get_data "${URL}/${L_SNAPUUID}.zstd" | zstd -d | btrfs receive -q "${L_SNAPPATH}"; then
+	        echo " - SUCCESS"
+	    else
+	        echo " - FAIL"
+	        SUCCESS=false
+	    fi
         fi
     fi
 done
 
-if [ "${URL_ACTION}" = "remember" ] && [ ${SUCCESS} = "true" ] then
+if [ "${URL_ACTION}" = "remember" ] && [ ${SUCCESS} = "true" ]; then
     echo "${URL}" >> "${FRICL}/repos.txt"
     echo "Repos now:"
     cat "${FRICL}/repos.txt"
