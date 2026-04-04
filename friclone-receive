@@ -62,10 +62,10 @@ SNAPDIR="${FRICL}/snapshots/${FS_UUID}"
 
 IFS="\n"
 SNAPSHOTS=""
-if [ "${URL_ACTION}" = "forget" ] then
+if [ "${URL_ACTION}" = "forget" ]; then
     cat "${FRICL}/repos.txt" | grep -v "^${URL}\$" > "${FRICL}/repos.txt"
     exit 0;
-elif [ -z "${URL}" ] then
+elif [ -z "${URL}" ]; then
     if URLLIST=$(cat ${FRICL}/repos.txt); then
         SUCCESS="true"
     fi
