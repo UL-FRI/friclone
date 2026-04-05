@@ -23,7 +23,7 @@ fi
 
 SUBVOL="$1"
 
-trap cleanup SIGHUP SIGINT SIGQUIT SIGKILL SIGALRM SIGTERM EXIT
+trap cleanup 0 1 2 3 6 9 14 15
 
 # save current dir
 _PWD=$(pwd)
