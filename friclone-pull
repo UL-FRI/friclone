@@ -15,17 +15,29 @@ fi
 SUBVOL="$1"
 shift
 
-ssh $* friclone-snapshot "${SUBVOL}"
-SNAPTAB=$(ssh $* friclone-send "${SUBVOL}" latest)
+if ! ssh $* friclone-snapshot "${SUBVOL}"; then
+    echo "friclone-snapshot ${SUBVOL} failed!"
+fi
+
+if ! SNAPTAB=$(ssh $* friclone-send "${SUBVOL}" latest); then
+    SNAPTAB=""
+    echo "friclone-send ${SUBVOL} latest failed!" >&2
+fi
+
+echo "SNAPTAB: ${SNAPTAB}"
 
 IFS='
 '
 
-for LINE in SNAPTAB; do
-    L_SNAPUUID=$(echo "${LINE}" | cut -d'	' -f 3)
-    L_SNAP=$(echo "${LINE}" | cut -d'	' -f 4)
-    L_SUBSUBVOL=$(echo "${LINE}" | cut -d'	' -f 5)
-    if ssh $* friclone-send ${SUBVOL} ${L_SNAP} ${L_SUBSUBVOL} > ${L_SNAPUUID}.zstd; then
+for LINE in "${SNAPTAB}"; do
+    L_SNAPUUID=$(echo "${LINE}" | cut -s -d'	' -f 3)
+    L_SNAP=$(echo "${LINE}" | cut -s -d'	' -f 4)
+    L_SUBSUBVOL=$(echo "${LINE}" | cut -s -d'	' -f 5)
+    if [ -z "${L_SNAPUUID}" ] || [ -z "${L_SNAP}" ] || [ -z "$L_SUBSUBVOL" ]; then
+        continue
+    fi
+    echo ssh $* friclone-send "${SUBVOL}" "${L_SNAP}" "${L_SUBSUBVOL}"
+    if ssh $* friclone-send "${SUBVOL}" "${L_SNAP}" "${L_SUBSUBVOL}" > "${L_SNAPUUID}.zstd"; then
         echo "${LINE}" >> snapshots.tsv
     else
         echo "FAILED TO GET ${L_SNAP}/${L_SUBSUBVOL}" >&2
