@@ -97,8 +97,8 @@ for LINE in ${SNAPSHOTS}; do
         L_LINK=$(echo "${LINE}" | cut -d'	' -f 6-)
         L_SNAPPATH=${SNAPDIR}/${L_SNAP}/${L_SUBSUBVOL}
 
-        mkdir "${SNAPDIR}/${L_SNAP}" 2> /dev/null
-        mkdir "${L_SNAPPATH}" 2> /dev/null
+        # mkdir -p "${SNAPDIR}/${L_SNAP}" 2> /dev/null
+        mkdir -p "${L_SNAPPATH}" 2> /dev/null
         if [ -L "${L_SNAPPATH}/link" ]; then
             if [ $(readlink "${L_SNAPPATH}/link") != "$L_LINK" ]; then
                 echo "Link exists but points to a different path!" >&2;
