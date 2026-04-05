@@ -8,6 +8,14 @@ print_help() {
     echo "  Creates a snapshot of all enrolled volumes for the filesystem containing <path>."
 }
 
+cleanup() {
+    # return to old dir
+    [ -z "$_PWD" ] && cd "$_PWD"
+    # cleanup
+    [ -z "${ROOTMNT}" ] && umount "${ROOTMNT}" && rmdir "${ROOTMNT}"
+    rmdir /run/friclone
+}
+
 if [ $# -lt 1 ]; then
     print_help >&2
     exit 1
@@ -15,31 +23,29 @@ fi
 
 SUBVOL="$1"
 
+trap cleanup SIGHUP SIGINT SIGQUIT SIGKILL SIGALRM SIGTERM EXIT
+
 # save current dir
 _PWD=$(pwd)
 
 # get filesystem UUID. If someone can fix this, please, do!
 FS_UUID=$(blkid -s UUID -o value $(btrfs filesystem usage "${SUBVOL}" | grep -o "/dev/[^ ]*" | tail -n -1)) || { echo "Can not determine filesystem UUID" >&2; exit 1; }
 
-# create dirs
-mkdir /run/friclone 2> /dev/null
+# create mount dirs
 ROOTMNT=/run/friclone/$FS_UUID
-mkdir "${ROOTMNT}" 2> /dev/null
+mkdir -p "${ROOTMNT}" 2> /dev/null
 
 # mount the root filesystem containing the volume to be enrolled
 mount -o subvol=/ /dev/disk/by-uuid/$FS_UUID /run/friclone/$FS_UUID
 
 # create friclone directories
 FRICL=/run/friclone/$FS_UUID/.friclone
-if ! [ -e "${FRICL}" ]; then
-    btrfs subvol create "${FRICL}"
-fi
-mkdir "${FRICL}/snapshots" 2> /dev/null
+[ -e "${FRICL}" ] || btrfs subvol create "${FRICL}"
+
 SNAPDIR="$FRICL/snapshots/${FS_UUID}"
-mkdir "${SNAPDIR}" 2> /dev/null
 DATE=$(date -u -Is)
 DESTPATH="${SNAPDIR}/${DATE}"
-mkdir "${DESTPATH}" 2> /dev/null
+mkdir -p "${DESTPATH}" 2> /dev/null
 
 LINKPATH="$FRICL/subvolumes/$FS_UUID/"
 if cd $LINKPATH; then 
@@ -53,13 +59,9 @@ if cd $LINKPATH; then
     done
 else
     echo "No subvolumes enrolled. Maybe use friclone-enroll?" >&2
+    exit 1
 fi
 
 rm "${SNAPDIR}/latest" 2> /dev/null
 ln -srf "${DESTPATH}" "${SNAPDIR}/latest"
-# return to old dir
-cd "$_PWD"
 
-# cleanup
-umount "$ROOTMNT" && rmdir "$ROOTMNT"
-rmdir /run/friclone
