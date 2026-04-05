@@ -29,7 +29,7 @@ echo "SNAPTAB: ${SNAPTAB}"
 IFS='
 '
 
-for LINE in "${SNAPTAB}"; do
+for LINE in ${SNAPTAB}; do
     L_SNAPUUID=$(echo "${LINE}" | cut -s -d'	' -f 3)
     L_SNAP=$(echo "${LINE}" | cut -s -d'	' -f 4)
     L_SUBSUBVOL=$(echo "${LINE}" | cut -s -d'	' -f 5)
