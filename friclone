@@ -156,8 +156,8 @@ switchto() {
             for i in $(ls | sort); do
                 # skip ../../../ - 9 characters
                 vol=$(readlink "${i}/link" | cut -c 10-)
-                mkdir -p "${BACKUP}/${i}/links" 2> /dev/null
-                mkdir -p "${BACKUP}/${i}/root" 2> /dev/null
+                mkdir -p "${BACKUP}/links" 2> /dev/null
+                mkdir -p "${BACKUP}/root" 2> /dev/null
                 cp -d "${i}/link" "${BACKUP}/links/${i}"
                 mv "${ROOTMNT}/${vol}" "${BACKUP}/root"
                 btrfs subvol snapshot "${i}/snapshot" "${ROOTMNT}/${vol}"
@@ -324,8 +324,9 @@ clean() {
     for snap in "${FRICL}/backup/${FS_UUID}"/*; do
         if [ -d "${snap}/root" ]; then
             for d in "${snap}/root"/*; do
+                [ "${d}" = "${snap}/root/*" ] && break
                 safe=""
-                vol_id=$(btrfs inspect-internal rootid "${snap}/root/${d}") || safe="no"
+                vol_id=$(btrfs inspect-internal rootid "${d}") || safe="no"
                 # if the volume is mounted anywhere, mark safe=no
                 for dev in $(mount -t btrfs | cut -s -d ' ' -f 1,6 | grep "[(,]subvolid=${vol_id}[,)]" | cut -s -d " " -f 1); do
                     dev_uuid=$(blkid -s UUID -o value "${dev}")
@@ -334,18 +335,19 @@ clean() {
                     fi
                 done
                 # if the volume is mounted anywhere, skip
+                if [ -z "${safe}" ]; then
+                    btrfs subvolume delete -R "${d}"
+                else
+                    echo "SKIP ${d} as it is mounted somewhere!" >&2
+                fi
+                # delete the snapshot dir if it is empty
+                rmdir "${d}" 2> /dev/null
             done
-            if [ -z "${safe}" ]; then
-                btrfs subvolume delete -R "${snap}/root/${d}"
-            else
-                echo "SKIP ${d} as it is mounted somewhere!" >&2
-            fi
+            rmdir "${snap}/root" 2> /dev/null
         fi
-        # delete the snapshot dir if it is empty
-        rmdir "${snap}/root/${d}" 2> /dev/null
         # delete the links if the snapshots are gone
-        [ -e "${snap}/root" ] || rm "${snap}/link/*" 2> /dev/null
-        rmdir "${snap}/link" 2> /dev/null
+        [ -e "${snap}/root" ] || rm "${snap}/links/"* 2> /dev/null
+        rmdir "${snap}/links" 2> /dev/null
         # delete the backup dir; this will fail if it is not empty
         rmdir "${snap}" 2> /dev/null
     done
