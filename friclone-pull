@@ -15,9 +15,9 @@ fi
 SUBVOL="$1"
 shift
 
-if ! ssh $* friclone snapshot "${SUBVOL}"; then
-    echo "friclone snapshot ${SUBVOL} failed!"
-fi
+#if ! ssh $* friclone snapshot "${SUBVOL}"; then
+#    echo "friclone snapshot ${SUBVOL} failed!"
+#fi
 
 if ! SNAPTAB=$(ssh $* friclone send "${SUBVOL}" latest); then
     SNAPTAB=""
