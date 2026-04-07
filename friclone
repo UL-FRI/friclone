@@ -463,6 +463,7 @@ initrd() {
     done
     echo "Friclone switch ${FS_UUID} to ${SNAP}"
     init_fricl
+    clean
     # TODO: if friclonerepo is set, receive new snapshots
     # TODO: switch all filesystems, not just root
     # TODO: if a filesystem does not exist, try to restore it from the repo
