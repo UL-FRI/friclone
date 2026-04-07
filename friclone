@@ -1,0 +1,544 @@
+#!/bin/sh
+
+
+print_help() {
+    echo "usage: $0 <command> [args]"
+    echo '
+Where command is one of:
+    enroll <path> <subvolname> - select a subvolume to be snapshotted
+    unenroll <path> - no longer snapshot a subvolume
+    snapshot <path> - create a snapshot
+    list <path> [snapshot] - list snapshots or subvolumes in a snapshot
+    name <path> <snapshot> <name> - name (and protect) a snapshot
+    switchto <path> <snapshot> - switch <path> to a specified version
+    receive [URL] [remember|forget] - receive snapshots from a remote
+    prune <path> - remove all snapshots without names or other references
+    remove <path> <snapshot> - remove a snapshot (or name)
+    clean <path> - remove subvolumes which were in use during a switch
+    send <path> <snapshot> - output list of subvolumes
+    send <path> <snapshot> [subvolume] - output compressed data to stdout
+    unbackup <path> - change a backup into a snapshot
+    initrd - non-interactively switch to snapshot
+
+If the friclone command is named friclone-initrd or the initrd subcommand
+is used directly, it perfrms a switch on the root filesystem. The snapshot
+is "stable" by default or specified by the argument 
+friclonesnap= in /proc/cmdline.
+'
+}
+
+get_data() {
+    set -e
+    URL=$1
+    SCHEMA=$(echo $URL | sed -e 's!\([^:]*\)://\(.*\)!\1!')
+    SRC=$(echo $URL | sed -e 's!\([^:]*\)://\(.*\)!\2!')
+    case "${SCHEMA}" in
+        file)
+            cat "${SRC}"
+            ;;
+        *)
+            wget -q -O - "${URL}"
+            ;;
+    esac
+}
+
+onexit() {
+    # return to old dir
+    [ -z "$_PWD" ] || cd "$_PWD"
+    # cleanup
+    [ -z "${ROOTMNT}" ] || { umount "${ROOTMNT}" 2> /dev/null && rmdir "${ROOTMNT}"; }
+    rmdir /run/friclone 2> /dev/null
+}
+
+trap onexit 0 1 2 3 6 9 14 15
+
+init_fricl() {
+    # get filesystem UUID. If someone can fix this, please, do!
+    if [ -z "${FS_UUID}" ]; then
+        VOLPATH=$1
+        [ -z "${VOLPATH}" ] && { echo "Filesystem not specified" >&2; exit 1; }
+        [ -e "${VOLPATH}" ] || { echo "No such file or directory: ${VOLPATH}" >&2; exit 1; }
+        FS_UUID=$(blkid -s UUID -o value $(btrfs filesystem usage "${VOLPATH}" | grep -o "/dev/[^ ]*" | tail -n -1)) || { echo "Can not determine filesystem UUID" >&2; exit 1; }
+    fi
+    # create mount dirs
+    ROOTMNT="/run/friclone/${FS_UUID}"
+    mkdir -p "${ROOTMNT}" 2> /dev/null
+
+    # mount the root filesystem containing the volume to be enrolled
+    mount -o subvol=/ /dev/disk/by-uuid/$FS_UUID "${ROOTMNT}"
+
+    # create friclone directories
+    FRICL="${ROOTMNT}/.friclone"
+    [ -e "${FRICL}" ] || btrfs subvol create "${FRICL}"
+    SNAPDIR="${FRICL}/snapshots/${FS_UUID}"
+    SUBVOLDIR="${FRICL}/subvolumes/${FS_UUID}"
+    if ! [ -z "${VOLPATH}" ] && INFO=$(btrfs subvol show "${VOLPATH}" 2>/dev/null); then
+        ABSVOLPATH=$(echo "${INFO}" | head -n 1)
+    fi
+    TRANSFERDIR="${FRICL}/transfers/${FS_UUID}"
+    mkdir -p "${TRANSFERDIR}" 2> /dev/null
+    DATE=$(date -u -Is)
+}
+
+list() {
+    for i in $(ls "$1" | sort); do
+        if [ -L "$1/$i" ]; then
+            echo "$i ->" $(readlink "$1/$i")
+        else
+            echo "$i"
+        fi
+    done
+}
+
+enroll () {
+    _PWD=$(pwd)
+    if [ -z ${ABSVOLPATH} ]; then
+        print_help
+        exit 1
+    fi
+    if [ -z "${VOLNAME}" ]; then
+        list "${SUBVOLDIR}"
+    else
+        ln -sfn "../../../${ABSVOLPATH}" "${SUBVOLDIR}/${VOLNAME}"
+    fi
+}
+
+unenroll() {
+    if [ -z "${SUBVOLDIR}" ]; then
+        print_help
+        exit 1
+    fi
+    if [ -L "${SUBVOLDIR}/${VOLNAME}" ]; then
+        rm "${SUBVOLDIR}/${VOLNAME}"
+    else 
+        list "${SUBVOLDIR}"
+    fi
+}
+
+snapshot() {
+    DESTPATH="${SNAPDIR}/${DATE}"
+    mkdir -p "${DESTPATH}" 2> /dev/null
+    # save current dir
+    _PWD=$(pwd)
+    if cd "${SUBVOLDIR}"; then 
+        for i in $(ls | sort); do
+            if vol=$(readlink $i); then
+                echo "snapshot ${vol} -> ${DESTPATH}/${i}/snapshot"
+                mkdir "${DESTPATH}/${i}"
+                cp -d $i "${DESTPATH}/${i}/link"
+                btrfs subvol snapshot -r "${vol}" "${DESTPATH}/${i}/snapshot"
+            fi
+        done
+    else
+        echo "No subvolumes enrolled. Maybe use friclone-enroll?" >&2
+        exit 1
+    fi
+    ln -sfnr "${DESTPATH}" "${SNAPDIR}/latest"
+}
+
+name() {
+    if [ -z "${SNAP}" ] || [ -z "${NAME}" ] || ! [ -e "${SNAPDIR}/${SNAP}" ]; then
+        list "${SNAPDIR}"
+    elif [ -L "${SNAPDIR}/${SNAP}" ]; then
+        rm "${SNAPDIR}/${NAME}" 2> /dev/null
+        cp -a "${SNAPDIR}/${SNAP}" "${SNAPDIR}/${NAME}"
+    else
+        ln -sfnr "${SNAPDIR}/${SNAP}" "${SNAPDIR}/${NAME}"
+    fi
+}
+
+switchto() {
+    SRCPATH="${SNAPDIR}/${SNAP}"
+    if [ ! -z ${SNAP} ] && [ -d "${SRCPATH}" ]; then
+        BACKUP="${FRICL}/backup/${FS_UUID}/${DATE}"
+        _PWD=$(pwd)
+        if cd "${SRCPATH}"; then
+            for i in $(ls | sort); do
+                # skip ../../../ - 9 characters
+                vol=$(readlink "${i}/link" | cut -c 10-)
+                mkdir -p "${BACKUP}/${i}/links" 2> /dev/null
+                mkdir -p "${BACKUP}/${i}/root" 2> /dev/null
+                cp -d "${i}/link" "${BACKUP}/links/${i}"
+                mv "${ROOTMNT}/${vol}" "${BACKUP}/root"
+                btrfs subvol snapshot "${i}/snapshot" "${ROOTMNT}/${vol}"
+            done
+        else
+            echo "No subvolumes enrolled. Maybe use friclone-enroll?" >&2
+        fi
+    else
+        list "${SNAPDIR}"
+    fi
+}
+
+receive() {
+    if [ "${URL_ACTION}" = "forget" ]; then
+        cat "${FRICL}/repos.txt" | grep -v "^${URL}\$" > "${FRICL}/repos.txt"
+        exit 0;
+    elif [ -z "${URL}" ]; then
+        if URLLIST=$(cat ${FRICL}/repos.txt); then
+            SUCCESS="true"
+        fi
+    else
+        URLLIST="${URL}";
+        SUCCESS="true"
+    fi
+
+    IFS='
+    '
+
+    for URL_I in ${URLLIST}; do
+        if SNAPS_I=$(get_data "${URL}/snapshots.tsv"); then
+            SNAPSHOTS="${SNAPS_I}"
+            URL="${URL_I}"
+            break
+        else
+            echo "Failed to fetch ${URL_I}/snapshots.tsv" >&2
+        fi
+    done
+
+    for LINE in ${SNAPSHOTS}; do
+        L_FSUUID=$(echo "${LINE}" | cut -s -d'	' -f 1)
+        if [ "${L_FSUUID}" = "${FS_UUID}" ]; then
+            L_SNAPUUID=$(echo "${LINE}" | cut -s -d'	' -f 2)
+            L_SNAP=$(echo "${LINE}" | cut -s -d'	' -f 3)
+            L_SUBSUBVOL=$(echo "${LINE}" | cut -s -d'	' -f 4)
+            L_LINK=$(echo "${LINE}" | cut -s -d'	' -f 5-)
+            L_SNAPPATH=${SNAPDIR}/${L_SNAP}/${L_SUBSUBVOL}
+
+            # mkdir -p "${SNAPDIR}/${L_SNAP}" 2> /dev/null
+            mkdir -p "${L_SNAPPATH}" 2> /dev/null
+            if [ -L "${L_SNAPPATH}/link" ]; then
+                if [ $(readlink "${L_SNAPPATH}/link") != "$L_LINK" ]; then
+                    echo "Link exists but points to a different path!" >&2;
+                    rm "${L_SNAPPATH}/link"
+                    ln -sf "${L_LINK}" "${L_SNAPPATH}/link"
+                fi
+            else
+                echo "ln -sf" "${L_LINK}" "${L_SNAPPATH}/link"
+                ln -sf "${L_LINK}" "${L_SNAPPATH}/link"
+            fi
+            SKIP_RECV="false"
+            if [ -e "${L_SNAPPATH}/snapshot" ]; then
+                echo "${L_SNAPPATH}/snapshot exists!"
+                SNAP_INFO=$(btrfs subvolume show "${L_SNAPPATH}/snapshot")
+                SNAP_UUID=$(echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p')
+                SNAP_RECVUUID=$(echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*Received UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p')
+                if [ "${SNAP_RECVUUID}" = "-" ] || [ -z ${SNAP_RECVUUID} ]; then
+                    SHOW_UUID="${SNAP_UUID}"
+                else
+                    SHOW_UUID="${SNAP_RECVUUID}"
+                fi
+                if [ "${SHOW_UUID}" != "${L_SNAPUUID}" ]; then
+                    echo "UUIDs do not match, deleting old snapshot" >&2
+                    btrfs subvolume delete "${L_SNAPPATH}/snapshot"
+                else
+                    echo "Skip existing snapshot ${L_SNAPUUID}" >&2
+                    SKIP_RECV="true"
+                fi
+            fi
+            if [ "${SKIP_RECV}" != "true" ]; then
+                echo -n "Receiving ${URL}/${L_SNAPUUID}.zstd"
+                if get_data "${URL}/${L_SNAPUUID}.zstd" | zstd -d | btrfs receive -q "${L_SNAPPATH}"; then
+                    echo " - SUCCESS"
+                    ln -sfnr "${L_SNAPPATH}" "${TRANSFERDIR}/recv-${L_SUBSUBVOL}-${L_SNAP}"
+                else
+                    echo " - FAIL"
+                    SUCCESS=false
+                fi
+            fi
+        fi
+    done
+
+    if [ "${URL_ACTION}" = "remember" ] && [ ${SUCCESS} = "true" ]; then
+        if ! grep -q "^${URL}\$" "${FRICL}/repos.txt"; then
+            echo "${URL}" >> "${FRICL}/repos.txt"
+        fi
+        echo "Repos now:"
+        cat "${FRICL}/repos.txt"
+    fi
+}
+
+prune() {
+    mkdir ${FRICL}/tmpkeep 2> /dev/null
+    TMPKEEP=${FRICL}/tmpkeep/${FS_UUID}
+    if [ -d "${TMPKEEP}" ]; then
+        echo "${TMPKEEP} exists - is another prune running?" >&2
+    else
+        mkdir ${TMPKEEP} 2> /dev/null
+        _PWD=$(pwd)
+        cd "${SNAPDIR}"
+        # Keep named snapshots
+        for i in *; do
+            if [ -L $i ]; then
+                mv "$(readlink $i)" "${TMPKEEP}"
+                mv "$i" "${TMPKEEP}"
+            fi
+        done
+        # Keep sent snapshots
+        cd "${TRANSFERDIR}"
+        for i in *; do
+            if [ -L $i ] && [ -e $i ]; then
+                dereffed=$(readlink "$i")
+                TMPSNAP=${TMPKEEP}/$(basename $(dirname ${dereffed}))
+                mkdir ${TMPSNAP} 2> /dev/null
+                mv "${dereffed}" "${TMPSNAP}"
+            fi
+        done
+        # Remove remaining directories / snapshots
+        cd "${SNAPDIR}"
+        for i in *; do
+            if [ -d $i ]; then
+                for subsubvol in $i/*; do
+                    if [ -d "${subsubvol}" ]; then
+                        btrfs subvolume delete "${subsubvol}/snapshot"
+                        rm "${subsubvol}/link"
+                        rmdir ${subsubvol}
+                    fi
+                done
+    rmdir $i
+            fi
+        done
+        mv ${TMPKEEP}/* .
+        rmdir ${TMPKEEP}
+    fi
+}
+
+remove() {
+    if [ -z "${SNAP}" ]; then
+        list "${SNAPDIR}"
+    elif [ -L "${SNAPDIR}/${SNAP}" ]; then
+        rm "${SNAPDIR}/${SNAP}";
+    elif [ -d "${SNAPDIR}/${SNAP}" ]; then
+        btrfs subvolume delete -R "${SNAPDIR}/${SNAP}"/*/snapshot
+        rm -rf "${SNAPDIR}/${SNAP}"
+        # remove dangling symlinks in transfers
+        for i in "${TRANSFERDIR}/"*; do
+            [ -L "$i" ] && ! [ -e "$i" ] && rm "$i";
+        done
+    else
+        ls "${SNAPDIR}"
+    fi
+}
+
+clean() {
+    for snap in "${FRICL}/backup/${FS_UUID}"/*; do
+        if [ -d "${snap}/root" ]; then
+            for d in "${snap}/root"/*; do
+                safe=""
+                vol_id=$(btrfs inspect-internal rootid "${snap}/root/${d}") || safe="no"
+                # if the volume is mounted anywhere, mark safe=no
+                for dev in $(mount -t btrfs | cut -s -d ' ' -f 1,6 | grep "[(,]subvolid=${vol_id}[,)]" | cut -s -d " " -f 1); do
+                    dev_uuid=$(blkid -s UUID -o value "${dev}")
+                    if [ "${dev_uuid}" = "${FS_UUID}" ]; then
+                        safe="no"
+                    fi
+                done
+                # if the volume is mounted anywhere, skip
+            done
+            if [ -z "${safe}" ]; then
+                btrfs subvolume delete -R "${snap}/root/${d}"
+            else
+                echo "SKIP ${d} as it is mounted somewhere!" >&2
+            fi
+        fi
+        # delete the snapshot dir if it is empty
+        rmdir "${snap}/root/${d}" 2> /dev/null
+        # delete the links if the snapshots are gone
+        [ -e "${snap}/root" ] || rm "${snap}/link/*" 2> /dev/null
+        rmdir "${snap}/link" 2> /dev/null
+        # delete the backup dir; this will fail if it is not empty
+        rmdir "${snap}" 2> /dev/null
+    done
+    # delete the backup dir if it is empty
+    rmdir "${FRICL}/backup/${FS_UUID}" 2> /dev/null
+}
+
+send() {
+    SRCPATH="$FRICL/snapshots/${FS_UUID}/${SNAP}"
+    if [ ! -z "${SNAP}" ] && [ -d "${SRCPATH}" ]; then
+        if cd "${SRCPATH}"; then
+            # always symlink to snapshots, not their names
+            [ -L "${SRCPATH}" ] && SNAP=$(readlink "${SRCPATH}")
+            if [ ! -z "${SUBSUBVOL}" ] && [ -d "${SRCPATH}/${SUBSUBVOL}" ]; then
+                # prepare symlink dirs
+                # read previously sent snapshots of the same volume
+                parents=""
+                for parent in "${TRANSFERDIR}/sent-${SUBSUBVOL}-"*/snapshot; do
+                    [ -e $parent ] && parents="${parents} -c "$(realpath "${parent}")
+                done
+                SENTLINK=${TRANSFERDIR}/sent-${SUBSUBVOL}-${SNAP}
+                if [ -e "${SENTLINK}" ] || [ -L "${SENTLINK}" ]; then
+                    echo "Refuse to send snapshot more than once" >&2;
+                else
+                    # SEND SNAPSHOT AND CREATE SYMLINK IN sent
+                    echo btrfs send --proto 0${parents} ${SRCPATH}/${SUBSUBVOL}/snapshot >&2
+                    { 
+                        btrfs send --proto 0${parents} ${SRCPATH}/${SUBSUBVOL}/snapshot &&\
+                            ln -r -s "${SRCPATH}/${SUBSUBVOL}" "${SENTLINK}" > /dev/null
+                    } | zstd -z --stdout
+                fi
+            else
+                # list the links / subsubvolumes in a snapshot
+                echo 'FS_UUID	SNAP_UUID	SNAP	SUBVOL	LINK'
+                for i in $(ls | sort); do
+                    SNAP_INFO=$(btrfs subvolume show $i/snapshot)
+                    SNAP_UUID=$(echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p')
+                    SNAP_RECVUUID=$(echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*Received UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p')
+                    if [ "${SNAP_RECVUUID}" = "-" ] || [ -z ${SNAP_RECVUUID}]; then
+                        SHOW_UUID="${SNAP_UUID}"
+                    else
+                        SHOW_UUID="${SNAP_RECVUUID}"
+                    fi
+                    echo -n "${FS_UUID}\t${SHOW_UUID}\t${SNAP}\t${i}\t"; readlink "${i}/link"
+                done
+            fi
+        else
+            echo "No subvolumes enrolled. Maybe use friclone-enroll?" >&2
+        fi
+    else
+        [ -z "${SNAP}" ] && ls "${SRCPATH}"
+    fi
+}
+
+unbackup () {
+    if [ -z "${SNAP}" ] || ! [ -d "${FRICL}/backup/${FS_UUID}/${SNAP}" ]; then
+        list "${FRICL}/backup/${FS_UUID}"
+    else
+        _PWD=$(pwd)
+        cd "${FRICL}/backup/${FS_UUID}/${SNAP}"
+        for i in $(ls links | sort -r); do
+            vol=$(readlink $i | cut -c 10-)
+            btrfs subvolume snapshot -r "root/${vol}" "${SNAPDIR}/${DATE}/${i}/snapshot" && \
+                btrfs subvolume delete "root/${vol}" && \
+                mv "links/$i" "${SNAPDIR}/${DATE}/${i}/link"
+        done
+    fi
+}
+
+initrd() {
+    SNAP="stable"
+    for x in $(cat /proc/cmdline); do
+        case ${x} in
+            friclonesnap=*)
+                SNAP=${x#friclonesnap=}
+                ;;
+            friclonerepo=*)
+                URL=${x#friclonesnap=}
+                ;;
+            root=*)
+                rootdev=${x#*=}
+                # Find the device node path depending on the form of root= :
+                case ${rootdev} in
+                    UUID=*)
+                        FS_UUID=${rootdev#UUID=}
+                        ;;
+                    LABEL=*)
+                        FS_UUID=$(blkid -s UUID -o rootdev /dev/disk/by-label/${value#LABEL=} )
+                        ;;
+                    *)
+                        FS_UUID=$(blkid -s UUID -o rootdev ${value})
+                        ;;
+                esac
+                ;;
+            systempart=*)
+                rootdev=${x#*=}
+                case ${rootdev} in
+                    UUID=*)
+                        FS_UUID=${rootdev#UUID=}
+                        ;;
+                    LABEL=*)
+                        FS_UUID=$(blkid -s UUID -o rootdev /dev/disk/by-label/${rootdev#LABEL=} )
+                        ;;
+                    *)
+                        FS_UUID=$(blkid -s UUID -o rootdev ${rootdev} )
+                        ;;
+                esac
+                ;;
+            rootflags=*)
+                ABSVOLPATH=$(echo "${flags}" | sed -s -e 's/.*[.=]subvol=\([^, ]*\)/\1/p')
+                ;;
+        esac
+    done
+    echo "Friclone switch ${FS_UUID} to ${SNAP}"
+    init_fricl
+    # TODO: if friclonerepo is set, receive new snapshots
+    # TODO: switch all filesystems, not just root
+    # TODO: if a filesystem does not exist, try to restore it from the repo
+    switchto
+}
+
+main(){
+    if [ -z "${CMD}" ]; then
+        return 0
+    fi
+    init_fricl $*
+    case "${CMD}" in
+        enroll)
+            VOLNAME="$2"
+            enroll
+            ;;
+        unenroll)
+            VOLNAME="$2"
+            unenroll
+            ;;
+        snapshot)
+            snapshot
+            ;;
+        list)
+            list "${SNAPDIR}"
+            ;;
+        name)
+            SNAP="$2"
+            NAME="$3"
+            name
+            ;;
+        switchto)
+            SNAP=$2
+            switchto
+            ;;
+        receive)
+            URL=$2
+            URL_ACTION=$3
+            receive
+            ;;
+        prune)
+            prune
+            ;;
+        remove)
+            SNAP=$2
+            remove
+            ;;
+        clean)
+            clean
+            ;;
+        send)
+            SNAP=$2
+            SUBSUBVOL=$3
+            send
+            ;;
+        unbackup)
+            unbackup
+            ;;
+        initrd)
+            initrd
+            ;;
+        *)
+            print_help
+            ;;    
+    esac
+}
+
+if [ $(basename "$0") = "friclone-initrd" ]; then
+    initrd
+elif [ $(basename "$0") = "friclone" ]; then
+    CMD="$1"
+    if [ $# -lt 1 ]; then
+        print_help
+        exit 1
+    fi
+    shift
+    main $*
+else
+    echo "unknown command: |$0| - expected friclone or friclone-initrd" >&2
+    exit 1
+fi
