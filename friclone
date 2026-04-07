@@ -187,7 +187,7 @@ receive() {
     '
 
     for URL_I in ${URLLIST}; do
-        if SNAPS_I=$(get_data "${URL}/snapshots.tsv"); then
+        if SNAPS_I=$(get_data "${URL_I}/snapshots.tsv"); then
             SNAPSHOTS="${SNAPS_I}"
             URL="${URL_I}"
             break
