@@ -153,12 +153,12 @@ switchto() {
         BACKUP="${FRICL}/backup/${FS_UUID}/${DATE}"
         _PWD=$(pwd)
         if cd "${SRCPATH}"; then
+            mkdir -p "${BACKUP}/links" 2> /dev/null
+            mkdir -p "${BACKUP}/root" 2> /dev/null
             for i in $(ls | sort); do
                 # skip ../../../ - 9 characters
                 vol=$(readlink "${i}/link" | cut -c 10-)
-                mkdir -p "${BACKUP}/links" 2> /dev/null
-                mkdir -p "${BACKUP}/root" 2> /dev/null
-                cp -d "${i}/link" "${BACKUP}/links/${i}"
+                cp -a "${i}/link" "${BACKUP}/links/${i}"
                 mv "${ROOTMNT}/${vol}" "${BACKUP}/root"
                 btrfs subvol snapshot "${i}/snapshot" "${ROOTMNT}/${vol}"
             done
@@ -457,7 +457,7 @@ initrd() {
                 esac
                 ;;
             rootflags=*)
-                ABSVOLPATH=$(echo "${flags}" | sed -s -e 's/.*[.=]subvol=\([^, ]*\)/\1/p')
+                ABSVOLPATH=$(echo "${flags}" | sed -e 's/.*[.=]subvol=\([^, ]*\)/\1/p')
                 ;;
         esac
     done
