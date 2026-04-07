@@ -468,6 +468,7 @@ initrd() {
     # TODO: switch all filesystems, not just root
     # TODO: if a filesystem does not exist, try to restore it from the repo
     switchto
+    clean
 }
 
 main(){
