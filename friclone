@@ -295,10 +295,10 @@ prune() {
                         rmdir ${subsubvol}
                     fi
                 done
-    rmdir $i
+            rmdir $i
             fi
         done
-        mv ${TMPKEEP}/* .
+        mv ${TMPKEEP}/* 2> /dev/null
         rmdir ${TMPKEEP}
     fi
 }
@@ -409,10 +409,10 @@ unbackup () {
         _PWD=$(pwd)
         cd "${FRICL}/backup/${FS_UUID}/${SNAP}"
         for i in $(ls links | sort -r); do
-            vol=$(readlink $i | cut -c 10-)
-            btrfs subvolume snapshot -r "root/${vol}" "${SNAPDIR}/${DATE}/${i}/snapshot" && \
-                btrfs subvolume delete "root/${vol}" && \
-                mv "links/$i" "${SNAPDIR}/${DATE}/${i}/link"
+            vol=$(readlink "links/${i}" | cut -c 10-)
+            mkdir -p "${SNAPDIR}/${DATE}/${i}"
+            btrfs subvolume snapshot -r "root/${vol}" "${SNAPDIR}/${DATE}/${i}/snapshot"
+            cp -a "links/$i" "${SNAPDIR}/${DATE}/${i}/link"
         done
     fi
 }
@@ -519,6 +519,7 @@ main(){
             send
             ;;
         unbackup)
+            SNAP=$2
             unbackup
             ;;
         initrd)
