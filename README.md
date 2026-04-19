@@ -21,7 +21,12 @@ update-initramfs
 #### Add (Enroll) volumes to be snapshotted
 
 ```
-friclone enroll /
+friclone enroll / 01-root
+# if /home/user is on a separate subvolume
+friclone enroll /home/user 02-userhome
+# for some reason, ubuntu has these as separate subvolumes
+friclone enroll /var/lib/portables 03-portables
+friclone enroll /var/lib/machines 04-machines
 ```
 
 #### Create snapshot
@@ -72,6 +77,13 @@ After this works once, you can just use:
 
 ```
 friclone receive /
+```
+
+When you want to switch to the newly received snapshot, use something like:
+
+```
+friclone name / 2026-01-01T12:13:24+00:00 latest
+friclone switchto / latest
 ```
 
 ## Development
