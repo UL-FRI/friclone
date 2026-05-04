@@ -1,0 +1,46 @@
+#!/bin/sh
+
+PAM_USER=$1
+
+PASS_ENT=$(getent passwd ${PAM_USER})
+ORIG_UID=$(getent passwd asistent | cut -s -d: -f3)
+
+HOME=$(echo "${PASS_ENT}" | cut -s -d: -f6)
+REMOTE_HOME=$(echo "${HOME}" | sed -e s/\\/home\\//\\/remote_home\\// )
+UID=$(echo "${PASS_ENT}" | cut -s -d: -f3)
+GID=$(echo "${PASS_ENT}" | cut -s -d: -f4)
+
+FULL_USER=$(echo "${PASS_ENT}" | cut -s -d: -f1)
+
+# echo "-----" 
+# echo "TEST FOR ${REMOTE_HOME}" 
+#if test -d "${REMOTE_HOME}"; then
+#        echo "XCREATING /local_home/${UID}" 
+#fi
+
+# /usr/local/bin/home_clone_clean
+
+if test "${UID}" -gt 1100 || test "${PAM_USER}" = "student"; then
+	SNAPSHOT_HOME="/local_home/home_snapshots/${UID}" 
+	if ! test -d "${SNAPSHOT_HOME}"; then
+		btrfs subvolume snapshot /local_home/asistent "${SNAPSHOT_HOME}"
+	fi
+	if ! test -e "${HOME}"; then
+		mkdir "${HOME}"
+	fi
+	if ! mountpoint -q "${HOME}"; then
+		#echo mount -o bind -o "X-mount.idmap=u:${ORIG_UID}:${UID}:1 g:${ORIG_UID}:${GID}:1" "${SNAPSHOT_HOME}" "${HOME}"
+		mount -o bind -o "X-mount.idmap=u:${ORIG_UID}:${UID}:1 g:${ORIG_UID}:${GID}:1 u:0:0:999 g:0:0:999" "${SNAPSHOT_HOME}" "${HOME}"
+		if test "${UID}" -gt 1100; then
+			# su "${PAM_USER}" -c "ls \"${REMOTE_HOME}\""
+			if setpriv --reuid="${UID}" test -e "${REMOTE_HOME}"; then
+				mv "${SNAPSHOT_HOME}/home_share" "${SNAPSHOT_HOME}/asistent_home_share"
+                        	ln -s "${REMOTE_HOME}" "${SNAPSHOT_HOME}/home_share"
+				chown -h asistent:asistent "${SNAPSHOT_HOME}/home_share" 
+			else
+				echo "${REMOTE_HOME} does not exist!"
+			fi
+		fi
+		home_clone_fix ${UID}
+	fi
+fi
