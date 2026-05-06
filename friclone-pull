@@ -43,6 +43,11 @@ for LINE in ${SNAPTAB}; do
     echo ssh $* friclone send "${SUBVOL}" "${L_SNAP}" "${L_SUBSUBVOL}"
     if ssh $* friclone send "${SUBVOL}" "${L_SNAP}" "${L_SUBSUBVOL}" > "${L_SNAPUUID}.zstd"; then
         echo "${LINE}" >> snapshots.tsv
+        if TARGET=$(ssh $* friclone showlink "${SUBVOL}" "${L_SNAP}" "showlink"); then
+            if ! [ -z "${TARGET}" ]; then
+                echo "${TARGET}"
+            fi
+        fi
     else
         echo "FAILED TO GET ${L_SNAP}/${L_SUBSUBVOL}" >&2
     fi

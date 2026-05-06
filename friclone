@@ -17,6 +17,7 @@ Where command is one of:
     clean <path> - remove subvolumes which were in use during a switch
     send <path> <snapshot> - output list of subvolumes
     send <path> <snapshot> [subvolume] - output compressed data to stdout
+    showlink <path> <name> - output tab separated pair name -> snapshot 
     unbackup <path> - change a backup into a snapshot
     initrd - non-interactively switch to snapshot
 
@@ -220,7 +221,7 @@ receive() {
             fi
             SKIP_RECV="false"
             if [ -e "${L_SNAPPATH}/snapshot" ]; then
-                echo "${L_SNAPPATH}/snapshot exists!"
+                # echo "${L_SNAPPATH}/snapshot exists!"
                 SNAP_INFO=$(btrfs subvolume show "${L_SNAPPATH}/snapshot")
                 SNAP_UUID=$(echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p')
                 SNAP_RECVUUID=$(echo "${SNAP_INFO}" | sed -n -e '/^[[:space:]]*Received UUID:/s/.*UUID:[[:space:]]*\([a-z0-9-]*\).*$/\1/p')
@@ -233,7 +234,7 @@ receive() {
                     echo "UUIDs do not match, deleting old snapshot" >&2
                     btrfs subvolume delete "${L_SNAPPATH}/snapshot"
                 else
-                    echo "Skip existing snapshot ${L_SNAPUUID}" >&2
+                    # echo "Skip existing snapshot ${L_SNAPUUID}" >&2
                     SKIP_RECV="true"
                 fi
             fi
@@ -249,13 +250,26 @@ receive() {
             fi
         fi
     done
-
-    if [ "${URL_ACTION}" = "remember" ] && [ ${SUCCESS} = "true" ]; then
-        if ! grep -q "^${URL}\$" "${FRICL}/repos.txt"; then
-            echo "${URL}" >> "${FRICL}/repos.txt"
+    
+    if [ ${SUCCESS} = "true" ]; then
+        unset NAMES
+        if NAMES_I=$(get_data "${URL}/names.tsv"); then
+            NAMES="${NAMES_I}"
+        else
+           echo "Failed to fetch ${URL_I}/names.tsv" >&2
         fi
-        echo "Repos now:"
-        cat "${FRICL}/repos.txt"
+        for LINE in ${NAMES}; do
+            SNAP=$(echo "${LINE}" | cut -s -d'	' -f 1)
+            NAME=$(echo "${LINE}" | cut -s -d'	' -f 2)
+            name
+        done
+        if [ "${URL_ACTION}" = "remember" ]; then
+            if ! grep -q "^${URL}\$" "${FRICL}/repos.txt"; then
+                echo "${URL}" >> "${FRICL}/repos.txt"
+            fi
+            echo "Repos now:"
+            cat "${FRICL}/repos.txt"
+        fi
     fi
 }
 
@@ -490,7 +504,11 @@ main(){
             snapshot
             ;;
         list)
-            list "${SNAPDIR}"
+            if [ $# -lt 2 ]; then
+                list "${SNAPDIR}"
+            else
+                list "${SNAPDIR}" "$2"
+            fi
             ;;
         name)
             SNAP="$2"
@@ -520,6 +538,17 @@ main(){
             SNAP=$2
             SUBSUBVOL=$3
             send
+            ;;
+        showlink)
+            if [ $# -eq 2 ]; then
+                NAME="$2"
+                if [ -L "${SNAPDIR}/${NAME}" ]; then
+                    TARGET=$(readlink "${SNAPDIR}/${NAME}")
+                    if [ -e "${SNAPDIR}/${TARGET}" ]; then
+                        echo "${TARGET}\t${NAME}"
+                    fi
+                fi
+            fi
             ;;
         unbackup)
             SNAP=$2
