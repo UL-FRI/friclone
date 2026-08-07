@@ -1,0 +1,46 @@
+#!/bin/sh
+
+PAM_USER=$1
+
+PASS_ENT=$(getent passwd ${PAM_USER})
+ORIG_UID=$(getent passwd asistent | cut -s -d: -f3)
+
+HOME=$(echo "${PASS_ENT}" | cut -s -d: -f6)
+REMOTE_HOME=$(echo "${HOME}" | sed -e s:/home/:/remote_home/: )
+UID=$(echo "${PASS_ENT}" | cut -s -d: -f3)
+FULL_USER=$(echo "${PASS_ENT}" | cut -s -d: -f1)
+
+PREFIX=/local_home/home_snapshots/$UID
+
+PROTO_HOME_STRING="/local_home/asistent"
+PROTO_USER="asistent"
+PROTO_GROUP="asistent"
+
+IFS="
+"
+
+for fpath in $(cat /etc/home_clone_fixfiles); do
+  for i in ${PREFIX}/${fpath}; do
+    # echo sed -i "s:${PROTO_HOME_STRING}:${HOME}:" "${i}";
+    [ -e "${i}" ] && sed -i "s:${PROTO_HOME_STRING}:${HOME}:g" "${i}";
+  done
+done
+
+
+for fpath in $(cat /etc/home_clone_fixlinks); do
+  for i in ${PREFIX}/${fpath}; do
+    echo "Fixing $i"
+    if [ -L "${i}" ]; then
+      target=$(readlink "${i}" | sed -e "s:${PROTO_HOME_STRING}:${HOME}:g") 
+      ln -sfn "${target}" "${i}"
+      chown -h "${ORIG_UID}":"${ORIG_UID}" "${i}"
+      if ! [ -e "${i}" ]
+        echo "    removing $i"
+        rm ${i}
+      fi
+      # echo ln -sfn "${target}" "${i}"
+    fi
+  done
+done
+
+mv "${PREFIX}/.wine/drive_c/users/asistent" "${PREFIX}/.wine/drive_c/users/${FULL_USER}"

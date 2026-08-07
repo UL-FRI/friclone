@@ -1,0 +1,14 @@
+.wine/system.reg
+.wine/userdef.reg
+.wine/user.reg
+.local/share/user-places.xbel.bak
+.local/share/user-places.xbel
+.local/share/applications/mw-matlab.desktop
+.local/share/applications/mw-simulink.desktop
+.local/share/applications/mw-matlabconnector.desktop
+.vscode/extensions/extensions.json
+.MathWorks/ServiceHost/ucilnica-linux/LatestInstall.info
+.MathWorks/ServiceHost/-mw_shared_installs/v2025.13.0.5/bin/glnxa64/cef_locales/sk.pak
+.MathWorks/ServiceHost/-mw_shared_installs/v2025.13.0.5/bin/glnxa64/cef_locales/hr.pak
+.MathWorks/ServiceHost/-mw_shared_installs/v2025.13.0.5/bin/glnxa64/cef_locales/lv.pak
+.MathWorks/mwPersistentRegistry/*/*.adr

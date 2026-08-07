@@ -1,0 +1,4 @@
+.wine/drive_c/users/asistent/*
+.MathWorks/ServiceHost/*/*
+.local/share/keyrings
+.local/share/kwalletd

@@ -1,0 +1,29 @@
+#!/bin/sh
+
+LOGIN_JSON=$(loginctl -j list-users)
+
+
+KEEP_UIDS=$(echo ${LOGIN_JSON} | jq -r 'map(.uid) | join("\t")')
+KEEP_UIDS="${KEEP_UIDS}\t0"
+
+for homedir in /home/*; do
+	UID=$(stat -c "%u" "${homedir}")
+	if echo "${KEEP_UIDS}" | grep -w -q "${UID}"; then
+		# echo "Don't recursively umount ${UID}"
+		true
+	else
+		umount --recursive "${homedir}";
+		rmdir "${homedir}"
+	fi
+done
+
+cd /local_home/home_snapshots
+for snapshot in $(ls); do
+	if echo "${KEEP_UIDS}" | grep -w -q "${snapshot}"; then
+		# echo "Keep ${snapshot}"
+		true
+	else
+		# echo $snapshot
+		btrfs subvol del "${snapshot}" 2> /dev/null > /dev/null;
+	fi
+done
