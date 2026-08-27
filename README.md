@@ -39,7 +39,6 @@ friclone unenroll /home/user
 #### Unenroll enrolled volumes
 
 ```
-
 friclone unenroll / 01-root
 friclone unenroll / 02-userhome
 friclone unenroll /va/lib/portables 03-userhome
