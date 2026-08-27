@@ -29,6 +29,22 @@ friclone enroll /var/lib/portables 03-portables
 friclone enroll /var/lib/machines 04-machines
 ```
 
+#### Show a list of enrolled volumes
+
+```
+friclone unenroll /
+friclone unenroll /home/user
+```
+
+#### Unenroll enrolled volumes
+
+```
+
+friclone unenroll / 01-root
+friclone unenroll / 02-userhome
+friclone unenroll /va/lib/portables 03-userhome
+```
+
 #### Create snapshot
 
 ```
