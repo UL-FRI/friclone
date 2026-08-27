@@ -74,6 +74,7 @@ init_fricl() {
     SNAPDIR="${FRICL}/snapshots/${FS_UUID}"
     SUBVOLDIR="${FRICL}/subvolumes/${FS_UUID}"
     mkdir -p "${SUBVOLDIR}" 2> /dev/null
+    mkdir -p "${SNAPDIR}" 2> /dev/null
     if ! [ -z "${VOLPATH}" ] && INFO=$(btrfs subvol show "${VOLPATH}" 2>/dev/null); then
         ABSVOLPATH=$(echo "${INFO}" | head -n 1)
     fi
