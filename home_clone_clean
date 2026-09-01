@@ -7,12 +7,13 @@ PROTO_USER="asistent"
 PROTO_GROUP="asistent"
 
 SNAPSHOT_HOME_BASE="/home/home_snapshots"
+ADMIN_HOME="/home/local_admin"
 
 KEEP_UIDS=$(echo ${LOGIN_JSON} | jq -r 'map(.uid) | join("\t")')
 KEEP_UIDS="${KEEP_UIDS}\t0"
 
 for homedir in /home/*; do
-    if [ "$homedir" != "$PROTO_HOME" ] && [ "$homedir" != "$SNAPSHOT_HOME_BASE" ]; then
+    if [ "$homedir" != "$PROTO_HOME" ] && [ "$homedir" != "$SNAPSHOT_HOME_BASE" ] && [ "$homedir" != "$ADMIN_HOME" ]; then
         UID=$(stat -c "%u" "${homedir}")
         if echo "${KEEP_UIDS}" | grep -w -q "${UID}"; then
             # echo "Don't recursively umount ${UID}"
