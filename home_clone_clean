@@ -2,22 +2,30 @@
 
 LOGIN_JSON=$(loginctl -j list-users)
 
+PROTO_HOME="/home/asistent"
+PROTO_USER="asistent"
+PROTO_GROUP="asistent"
+
+SNAPSHOT_HOME_BASE="/home/home_snapshots"
 
 KEEP_UIDS=$(echo ${LOGIN_JSON} | jq -r 'map(.uid) | join("\t")')
 KEEP_UIDS="${KEEP_UIDS}\t0"
 
 for homedir in /home/*; do
-	UID=$(stat -c "%u" "${homedir}")
-	if echo "${KEEP_UIDS}" | grep -w -q "${UID}"; then
-		# echo "Don't recursively umount ${UID}"
-		true
-	else
-		umount --recursive "${homedir}";
-		rmdir "${homedir}"
-	fi
+    if [ "$homedir" != "$PROTO_HOME" ] && [ "$homedir" != "$SNAPSHOT_HOME_BASE" ]; then
+        UID=$(stat -c "%u" "${homedir}")
+        if echo "${KEEP_UIDS}" | grep -w -q "${UID}"; then
+            # echo "Don't recursively umount ${UID}"
+            true
+        else
+            umount --recursive "${homedir}";
+            rmdir "${homedir}"
+        fi
+    fi
 done
 
-cd /local_home/home_snapshots
+[ ! -d /home/home_snapshots ] && mkdir /home/home_snapshots
+cd /home/home_snapshots
 for snapshot in $(ls); do
 	if echo "${KEEP_UIDS}" | grep -w -q "${snapshot}"; then
 		# echo "Keep ${snapshot}"

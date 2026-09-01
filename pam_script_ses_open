@@ -1,8 +1,6 @@
 #!/bin/sh
 
+/usr/local/bin/home_clone_clean >> /var/log/home_clone.log 2>&1
 
-/usr/local/bin/home_clone_clean
-
-/usr/local/bin/home_clone "${PAM_USER}" 2>&1 >> /my_silly_pam_log.txt
-#/usr/local/bin/home_clone "${PAM_USER}" 2> /dev/null > /dev/null
+/usr/local/bin/home_clone "${PAM_USER}" >> /var/log/home_clone.log 2>&1
 
