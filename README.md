@@ -5,6 +5,8 @@ The system used for btrfs-snapshotted homes on classroom computers
 
 ## Installation
 
+The quick way to install `frihomeclone` is to run `install.sh` as root. More details are below.
+
 The executables `home_clone`, `home_clone_fix` and `home_clone_clean` go into `/usr/local/bin`, 
 the PAM script `pam_script_ses_open` goes into `/usr/share/libpam-script` and the files in 
 `share` go into `/usr/local/share/home_clone`. Executables and the PAM script all need 
