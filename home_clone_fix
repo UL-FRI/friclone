@@ -5,8 +5,12 @@
 
 PAM_USER=$1
 
-PASS_ENT=$(getent passwd ${PAM_USER})
-ORIG_UID=$(getent passwd asistent | cut -s -d: -f3)
+PROTO_HOME_STRING="/home/asistent"
+PROTO_USER="asistent"
+PROTO_GROUP="asistent"
+
+PASS_ENT=$(getent passwd "${PAM_USER}")
+ORIG_UID=$(getent passwd "${PROTO_USER}" | cut -s -d: -f3)
 
 HOME=$(echo "${PASS_ENT}" | cut -s -d: -f6)
 REMOTE_HOME=$(echo "${HOME}" | sed -e s:/home/:/remote_home/: )
@@ -15,10 +19,6 @@ FULL_USER=$(echo "${PASS_ENT}" | cut -s -d: -f1)
 
 SNAPSHOT_PREFIX=/home/home_snapshots/$UID
 FIX_PREFIX=/usr/local/share/home_clone
-
-PROTO_HOME_STRING="/home/asistent"
-PROTO_USER="asistent"
-PROTO_GROUP="asistent"
 
 IFS="
 "
@@ -50,4 +50,4 @@ for fpath in $(cat "${FIX_PREFIX}/fixlinks"); do
 done
 
 # Wine-specific: rename the user's home inside the default Wine prefix
-mv "${PREFIX}/.wine/drive_c/users/asistent" "${PREFIX}/.wine/drive_c/users/${FULL_USER}"
+mv "${PREFIX}/.wine/drive_c/users/${PROTO_USER}" "${PREFIX}/.wine/drive_c/users/${FULL_USER}"
