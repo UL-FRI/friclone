@@ -11,9 +11,9 @@ PROTO_GROUP="asistent"
 
 SNAPSHOT_HOME_BASE="/home/home_snapshots"
 
-PASS_ENT=$(getent passwd ${PAM_USER})
-ORIG_UID=$(getent passwd ${PROTO_USER} | cut -s -d: -f3)
-ORIG_GID=$(getent passwd ${PROTO_GROUP} | cut -s -d: -f4)
+PASS_ENT=$(getent passwd "${PAM_USER}")
+ORIG_UID=$(getent passwd "${PROTO_USER}" | cut -s -d: -f3)
+ORIG_GID=$(getent passwd "${PROTO_GROUP}" | cut -s -d: -f4)
 
 HOME=$(echo "${PASS_ENT}" | cut -s -d: -f6)
 # location of the Samba mounted home
@@ -50,7 +50,7 @@ if test "${UID}" -gt 1100 || test "${PAM_USER}" = "student"; then
         
             # the prototype home has symlinks to ${SNAPSHOT_HOME}/home_share, 
             # so user's preferences don't get overwritten
-			if setpriv --reuid="${UID}" --regid="#{GID}" test -e "${REMOTE_HOME}"; then
+			if setpriv --reuid="${UID}" --regid="${GID}" test -e "${REMOTE_HOME}"; then
 				mv "${SNAPSHOT_HOME}/home_share" "${SNAPSHOT_HOME}/proto_home_share"
                 ln -s "${REMOTE_HOME}" "${SNAPSHOT_HOME}/home_share"
 				chown -h $PROTO_USER:$PROTO_GROUP "${SNAPSHOT_HOME}/home_share" 
