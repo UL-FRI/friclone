@@ -1,8 +1,10 @@
 #!/bin/sh
 
-{ { 
-    /usr/local/bin/home_clone_clean >> /var/log/home_clone.log 2>&1; 
-} && {
-    /usr/local/bin/home_clone "${PAM_USER}" >> /var/log/home_clone.log 2>&1;
-}; } >> /dev/null 2>&1
+if [ "${PAM_RUSER}" != "root" ]; then
+    { { 
+        /usr/local/bin/home_clone_clean >> /var/log/home_clone.log 2>&1; 
+    } && {
+        /usr/local/bin/home_clone "${PAM_USER}" >> /var/log/home_clone.log 2>&1;
+    }; } >> /dev/null 2>&1
+fi
 
