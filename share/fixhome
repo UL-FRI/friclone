@@ -7,8 +7,9 @@
 .local/share/applications/mw-simulink.desktop
 .local/share/applications/mw-matlabconnector.desktop
 .vscode/extensions/extensions.json
-.MathWorks/ServiceHost/ucilnica-linux/LatestInstall.info
-.MathWorks/ServiceHost/-mw_shared_installs/v2025.13.0.5/bin/glnxa64/cef_locales/sk.pak
-.MathWorks/ServiceHost/-mw_shared_installs/v2025.13.0.5/bin/glnxa64/cef_locales/hr.pak
-.MathWorks/ServiceHost/-mw_shared_installs/v2025.13.0.5/bin/glnxa64/cef_locales/lv.pak
+.MathWorks/ServiceHost/*/LatestInstall.info
+.MathWorks/ServiceHost/-mw_shared_installs/*/bin/glnxa64/cef_locales/sk.pak
+.MathWorks/ServiceHost/-mw_shared_installs/*/bin/glnxa64/cef_locales/hr.pak
+.MathWorks/ServiceHost/-mw_shared_installs/*/bin/glnxa64/cef_locales/lv.pak
 .MathWorks/mwPersistentRegistry/*/*.adr
+.MATLABConnector/*/LatestInstall.info
