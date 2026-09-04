@@ -23,23 +23,20 @@ FIX_PREFIX=/usr/local/share/home_clone
 IFS="
 "
 
-shopt -s nullglob
-
 # fix textual references to the home directory
 for fpath in $(cat "${FIX_PREFIX}/fixhome"); do
   for i in ${SNAPSHOT_PREFIX}/${fpath}; do
+    echo "Fixing home for $i"
     # echo sed -i "s:${PROTO_HOME_STRING}:${HOME}:" "${i}";
     [ -e "${i}" ] && sed -i "s:${PROTO_HOME_STRING}:${HOME}:g" "${i}";
   done
 done
 
-shopt -u nullglob
-
 
 # fix symbolic links to the home directory
 for fpath in $(cat "${FIX_PREFIX}/fixlinks"); do
   for i in ${SNAPSHOT_PREFIX}/${fpath}; do
-    echo "Fixing $i"
+    echo "Fixing symlinks for $i"
     if [ -L "${i}" ]; then
       target=$(readlink "${i}" | sed -e "s:${PROTO_HOME_STRING}:${HOME}:g") 
       ln -sfn "${target}" "${i}"
