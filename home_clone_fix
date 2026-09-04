@@ -23,6 +23,8 @@ FIX_PREFIX=/usr/local/share/home_clone
 IFS="
 "
 
+shopt -s nullglob
+
 # fix textual references to the home directory
 for fpath in $(cat "${FIX_PREFIX}/fixhome"); do
   for i in ${SNAPSHOT_PREFIX}/${fpath}; do
@@ -30,6 +32,8 @@ for fpath in $(cat "${FIX_PREFIX}/fixhome"); do
     [ -e "${i}" ] && sed -i "s:${PROTO_HOME_STRING}:${HOME}:g" "${i}";
   done
 done
+
+shopt -u nullglob
 
 
 # fix symbolic links to the home directory
